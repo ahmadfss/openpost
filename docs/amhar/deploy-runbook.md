@@ -46,7 +46,22 @@ In Publishing:
 
 First publish will download the 511 MB binary during **build**. The subsequent health check should see a running server. If the health check times out, check Logs: missing secrets, R2 errors, or ffmpeg missing are the usual causes.
 
-## 4. Custom domain `post.amhar.co` (do not guess records)
+## 4. If publish dies at "Installing packages"
+
+A first Reserved VM publish of this branch failed at the **Installing packages** stage with `no such language: bash`. Build and Bundle never ran.
+
+The original `.replit` set top-level `language = "bash"` and `[packager] language = "bash"`. Replit's package installer uses those keys to pick a language packager ([`.replit` configuration](https://docs.replit.com/features/project-setup/configuration), [dependency management](https://docs.replit.com/features/project-setup/dependency-management)). Bash is not a supported packager language, so the publish stopped there. Setting `[packager.features] enabledForHosting = false` did not skip the step.
+
+The fix is already in `.replit` on this branch:
+
+- Remove the top-level `language` key and the whole `[packager]` / `[packager.features]` sections, so the deploy uses only the Nix deps from `replit.nix`.
+- Keep `[nix]`, `run`, `entrypoint`, `[[ports]]`, and `[env]`.
+- Under `[deployment]`, set `deploymentTarget = "gce"` for Reserved VM. Official docs exemplify `cloudrun` on the configuration page; Reserved VM publishes use `gce` (choose Reserved VM in Publishing as well — see [deployment types](https://docs.replit.com/features/publishing/deployment-types)).
+- Do not add a `modules` line. Modules are language/runtime packager bundles such as `nodejs-20` or `python-3.10`. There is no documented bash module, and a language module would pull a packager we do not want. Do not work around this with Node or Bun.
+
+After pulling this change into the Repl, republish. Do not run `npm install` or `bun install`.
+
+## 5. Custom domain `post.amhar.co` (do not guess records)
 
 Replit, not Cloudflare, decides the exact DNS values. Do **not** create `post.amhar.co` in Cloudflare until the Replit Domains tool has printed the records.
 
@@ -63,7 +78,7 @@ Prepared steps:
 
 `media.post.amhar.co` is not a Replit domain. It is the R2 public custom domain for the media bucket.
 
-## 5. First boot
+## 6. First boot
 
 1. Open `https://post.amhar.co` (or the `.replit.app` URL if DNS is not yet live).
 2. Create the first account; it becomes the instance administrator.
@@ -71,7 +86,7 @@ Prepared steps:
 4. Run `OPENPOST_HEALTH_BASE=https://post.amhar.co bash scripts/amhar/smoke.sh`.
 5. Hand over to Badee3 using [handover-badee3.md](handover-badee3.md).
 
-## 6. What not to do
+## 7. What not to do
 
 - Do not merge to `main` except through a release PR after Ahmad's UAT.
 - Do not force-push.

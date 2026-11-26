@@ -1,23 +1,19 @@
 # Amhar OpenPost: run the pinned upstream release binary.
 # Do not install or build the JS/Go monorepo on this VM.
+# Runtime packages come from replit.nix (ffmpeg, sqlite, curl, etc.).
+# Do not set top-level language or [packager]: Replit's package installer
+# has no "bash" language, and a Reserved VM publish then dies at
+# "Installing packages" with "no such language: bash".
 run = "bash scripts/amhar/start.sh"
-language = "bash"
 entrypoint = "scripts/amhar/start.sh"
 
 [nix]
 channel = "stable-25_05"
 
-[packager]
-language = "bash"
-
-[packager.features]
-guessImports = false
-packageSearch = false
-enabledForHosting = false
-
 [deployment]
 run = ["bash", "scripts/amhar/start.sh"]
 build = ["bash", "scripts/amhar/build.sh"]
+deploymentTarget = "gce"
 
 [[ports]]
 localPort = 8080
