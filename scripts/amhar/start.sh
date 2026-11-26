@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Start OpenPost on the Replit Reserved VM.
 # Downloads the pinned binary if needed, restores SQLite from R2 after a
-# republish wipe, then serves HTTP and background jobs in one process.
+# republish wipe (fail closed if backups exist but none restore), then runs
+# OpenPost under Litestream, replicating to a per-boot generation path.
 set -euo pipefail
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
@@ -11,7 +12,7 @@ amhar_prepare_dirs
 amhar_export_r2
 
 bash scripts/amhar/download-binary.sh
-bash scripts/amhar/download-litestream.sh || echo "litestream download failed; continuous replication will be skipped" >&2
+bash scripts/amhar/download-litestream.sh
 
 # OpenPost ignores Replit's $PORT unless OPENPOST_PORT is set.
 export OPENPOST_PORT="${OPENPOST_PORT:-${PORT:-8080}}"
@@ -29,35 +30,66 @@ export OPENPOST_WORKFLOWS_AI_ENABLED="${OPENPOST_WORKFLOWS_AI_ENABLED:-false}"
 export OPENPOST_EMAIL_VERIFICATION_REQUIRED="${OPENPOST_EMAIL_VERIFICATION_REQUIRED:-false}"
 
 db="$(amhar_db_path)"
-if [[ ! -f "$db" ]]; then
-  if amhar_r2_configured; then
-    echo "no local database; attempting restore from R2"
-    if ! bash scripts/amhar/restore.sh; then
-      echo "no backup found; starting with a fresh SQLite database at $db"
-    fi
-  else
-    echo "no local database and R2 is not configured; starting with a fresh SQLite database at $db"
+gen_file="$(amhar_generation_file)"
+
+# 1. Get a database.
+#    - Local file present: an ordinary process restart on the same VM disk.
+#      Keep writing to this VM's own generation.
+#    - No local file (new VM after a republish): restore from R2. If R2 has
+#      backups but none restore cleanly, stop here (fail closed). Starting an
+#      empty database would lose every user, and Replit would promote it.
+if [[ -f "$db" ]]; then
+  echo "local database present at $db; not restoring"
+  if [[ ! -s "$gen_file" ]]; then
+    amhar_new_generation > "$gen_file"
   fi
+elif amhar_r2_configured; then
+  echo "no local database; restoring from R2"
+  rc=0
+  bash scripts/amhar/restore.sh || rc=$?
+  case "$rc" in
+    0) ;;
+    3) echo "R2 has no backups yet (first boot); starting with a fresh SQLite database at $db" ;;
+    *)
+      if [[ "${OPENPOST_ALLOW_FRESH_DB:-false}" == "true" ]]; then
+        echo "WARNING: restore failed and OPENPOST_ALLOW_FRESH_DB=true; starting with an EMPTY database" >&2
+      else
+        echo "FATAL: backups exist in R2 but none restored cleanly; refusing to start with an empty database." >&2
+        echo "FATAL: the previous deployment keeps serving. See docs/amhar/backup-and-restore.md." >&2
+        exit 1
+      fi
+      ;;
+  esac
+  # Every restored or fresh database replicates to a brand-new path, so it can
+  # never interleave with the VM that is still serving during a promote.
+  amhar_new_generation > "$gen_file"
+else
+  echo "no local database and R2 is not configured; starting with a fresh SQLite database at $db"
 fi
 
-if amhar_r2_configured && [[ -x "$(amhar_bin_dir)/litestream" ]]; then
+ls_bin="$(amhar_bin_dir)/litestream"
+server_bin="$(amhar_bin_dir)/openpost-server"
+
+if amhar_r2_configured && [[ -x "$ls_bin" ]]; then
+  gen="$(amhar_current_generation)"
   bash scripts/amhar/write-litestream-config.sh "$(amhar_data_dir)/litestream.yml"
-  "$(amhar_bin_dir)/litestream" replicate -config "$(amhar_data_dir)/litestream.yml" &
-  LITESTREAM_PID=$!
-  echo "litestream replicate started (pid $LITESTREAM_PID)"
+  echo "litestream generation $gen -> ${OPENPOST_LITESTREAM_GEN_ROOT%/}/$gen"
   (
-    # First snapshot shortly after boot, then nightly.
-    sleep 300
-    bash scripts/amhar/backup.sh || true
+    # First snapshot shortly after boot, then nightly. Never fatal.
+    sleep "${OPENPOST_BACKUP_FIRST_DELAY_SECONDS:-600}"
+    bash scripts/amhar/backup.sh || echo "backup failed (see above)" >&2
     while true; do
       sleep 86400
-      bash scripts/amhar/backup.sh || true
+      bash scripts/amhar/backup.sh || echo "backup failed (see above)" >&2
     done
   ) &
-  BACKUP_PID=$!
-  echo "nightly sqlite backup loop started (pid $BACKUP_PID)"
-  trap 'kill "$LITESTREAM_PID" "$BACKUP_PID" 2>/dev/null || true' TERM INT
+  echo "nightly sqlite backup loop started (pid $!)"
+  echo "starting openpost $OPENPOST_RELEASE on 0.0.0.0:${OPENPOST_PORT} (sqlite $db) under litestream replicate -exec"
+  # Litestream runs OpenPost as its child: on SIGTERM it stops OpenPost, does
+  # a final sync, and exits; if OpenPost exits, Litestream exits too.
+  exec "$ls_bin" replicate -config "$(amhar_data_dir)/litestream.yml" -exec "$server_bin"
 fi
 
+echo "WARNING: litestream is not running; the database is NOT being replicated" >&2
 echo "starting openpost $OPENPOST_RELEASE on 0.0.0.0:${OPENPOST_PORT} (sqlite $db)"
-exec "$(amhar_bin_dir)/openpost-server"
+exec "$server_bin"

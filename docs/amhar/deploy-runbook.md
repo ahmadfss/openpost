@@ -82,7 +82,7 @@ Prepared steps:
 
 1. Open `https://post.amhar.co` (or the `.replit.app` URL if DNS is not yet live).
 2. Create the first account; it becomes the instance administrator.
-3. Set `OPENPOST_DISABLE_REGISTRATIONS=true` in production Secrets and republish, or restart if Replit picks up the new value without a full republish. **A republish wipes the local SQLite file.** Confirm `scripts/amhar/start.sh` restored the database from R2 before considering the app live. If this is the first boot and no backup has been taken yet, take one (`bash scripts/amhar/backup.sh`) *before* any republish.
+3. Set `OPENPOST_DISABLE_REGISTRATIONS=true` in production Secrets and republish. **A republish wipes the local SQLite file** and restores it from R2. Before any republish run `bash scripts/amhar/restore.sh --check` and confirm `a boot would restore from: …` with the expected user count (see [backup-and-restore.md](backup-and-restore.md)). After the republish, confirm the log shows `database restored to` and the expected `users in restored database`.
 4. Run `OPENPOST_HEALTH_BASE=https://post.amhar.co bash scripts/amhar/smoke.sh`.
 5. Hand over to Badee3 using [handover-badee3.md](handover-badee3.md).
 
@@ -99,6 +99,26 @@ Fix (commit on `architect/setup`, `apps/server/internal/api/middleware/session_o
 - The trusted-proxy middleware now keeps the first value of a comma-separated `X-Forwarded-Proto`.
 
 **This is a source change.** The Reserved VM runs the pinned upstream binary (`deploy/replit/pin.env`, `scripts/amhar/build.sh` only downloads it), so a plain republish does not pick it up. Until a binary built from this branch is pinned, the config-only workaround is to set `OPENPOST_TRUSTED_PROXY_CIDRS` to the CIDR of Replit's proxy peer (read `remote_ip` in the request log; do not guess) and republish.
+
+## 6b. Republish safety: Litestream generations and failing closed
+
+Background: [backup-and-restore.md](backup-and-restore.md), incident of 26 Nov 2026. A Replit promote runs the old and new VMs at the same time, so each boot now replicates to its own path (`backups/litestream-gen/<generation>`). A boot that finds backups but cannot restore any of them stops with `FATAL: backups exist in R2 but none restored cleanly`, and the old VM keeps serving.
+
+Every republish:
+
+1. Run `bash scripts/amhar/restore.sh --check` (box or Repl Shell, R2 variables loaded). It must end with `check: a boot would restore from: litestream …` and show the expected `users in restored database`. If it says `FAIL CLOSED`, do not republish.
+2. Avoid admin changes while the promote runs. Writes to the old VM after the new VM restored are not carried over.
+3. Republish. In the deployment logs look for, in order:
+   - `restore candidates (newest first):`
+   - `OK: litestream <prefix>` and `users in restored database: <n>`
+   - `database restored to …`
+   - `litestream generation <id> -> backups/litestream-gen/<id>`
+   - `http server started on [::]:8080`
+4. Smoke: `OPENPOST_HEALTH_BASE=https://post.amhar.co bash scripts/amhar/smoke.sh`, sign in, and check the workspace and members.
+5. Run `restore.sh --check` again. It should now pick `backups/litestream-gen/<new id>`.
+6. About ten minutes after boot, the log shows `backup uploaded: backups/sqlite/<id>/openpost-….db and backups/sqlite/openpost-latest.db (…, <n> users)`.
+
+The deploy image has no python3. Deploy scripts use bash, curl (`--aws-sigv4`, `scripts/amhar/r2.sh`), `sqlite3`, coreutils, sed, grep and awk from `replit.nix`. Do not add python back to the boot path.
 
 ## 7. What not to do
 

@@ -30,7 +30,7 @@ Never commit values. Never paste tokens into chat or screenshots.
 | `OPENPOST_DATABASE_PATH` | Default `$HOME/openpost-data/db/openpost.db` |
 | `OPENPOST_STORAGE_DRIVER` | `s3` |
 | `TZ` | `Asia/Baghdad` |
-| `OPENPOST_DISABLE_REGISTRATIONS` | `false` until the first admin exists, then `true` |
+| `OPENPOST_DISABLE_REGISTRATIONS` | `false` until the first admin exists, then `true`. An admin override saved in Settings → Advanced → Configuration is stored encrypted in SQLite and applied after the environment at startup, so the override wins. Keep the secret `true` as well, so a database restored without the override is still closed. |
 | `OPENPOST_TRUSTED_PROXY_CIDRS` | Set once TLS is terminated in front of the process, if callbacks or scheme detection mis-fire |
 | `OPENPOST_TELEMETRY_ENABLED` | `false` |
 | `OPENPOST_WORKFLOWS_AI_ENABLED` | `false` until an AI key is explicitly approved |
@@ -44,8 +44,11 @@ Never commit values. Never paste tokens into chat or screenshots.
 | --- | --- |
 | `OPENPOST_BACKUP_BUCKET` | Same as `OPENPOST_S3_BUCKET` if unset |
 | `OPENPOST_BACKUP_PREFIX` | `backups/sqlite` |
-| `OPENPOST_LITESTREAM_PREFIX` | `backups/litestream` |
+| `OPENPOST_LITESTREAM_PREFIX` | `backups/litestream` (legacy path, read-only for restore) |
+| `OPENPOST_LITESTREAM_GEN_ROOT` | `backups/litestream-gen` (one replica path per boot) |
 | `OPENPOST_DATA_DIR` | `$HOME/openpost-data` |
+
+Restore overrides (`OPENPOST_RESTORE_FROM`, `OPENPOST_RESTORE_ALLOW_SNAPSHOT`, `OPENPOST_ALLOW_FRESH_DB`, timeouts) are listed in [backup-and-restore.md](backup-and-restore.md#overrides-operator-only). Leave them unset in normal operation.
 
 Litestream and the backup script also accept `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL`, and `AWS_REGION`. `start.sh` copies the `OPENPOST_S3_*` names into those if the AWS names are empty, so one key pair is enough when media and backups share the same credentials.
 

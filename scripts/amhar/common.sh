@@ -84,7 +84,38 @@ amhar_export_r2() {
   export AWS_REGION="${AWS_REGION:-auto}"
   export OPENPOST_BACKUP_BUCKET="${OPENPOST_BACKUP_BUCKET:-${OPENPOST_S3_BUCKET:-}}"
   export OPENPOST_BACKUP_PREFIX="${OPENPOST_BACKUP_PREFIX:-backups/sqlite}"
+  # Legacy single-writer replica path. Read-only for restore from now on.
   export OPENPOST_LITESTREAM_PREFIX="${OPENPOST_LITESTREAM_PREFIX:-backups/litestream}"
+  # One Litestream replica path per boot ("generation"), so the old and new
+  # VMs of a Replit blue-green promote never write to the same path.
+  export OPENPOST_LITESTREAM_GEN_ROOT="${OPENPOST_LITESTREAM_GEN_ROOT:-backups/litestream-gen}"
+}
+
+# Litestream replica URL for a bucket prefix. Keys come from the environment.
+amhar_litestream_url() {
+  printf 's3://%s/%s?endpoint=%s&region=%s\n' \
+    "$OPENPOST_BACKUP_BUCKET" "${1%/}" "$AWS_ENDPOINT_URL" "${AWS_REGION:-auto}"
+}
+
+amhar_generation_file() {
+  printf '%s\n' "$(amhar_data_dir)/generation"
+}
+
+# A new, unique generation id: UTC start time plus 6 random hex chars.
+amhar_new_generation() {
+  local rand
+  rand="$(od -An -N3 -tx1 /dev/urandom | tr -d ' \n')"
+  printf '%s-%s\n' "$(date -u +%Y%m%dT%H%M%SZ)" "$rand"
+}
+
+# Print the generation this VM writes to, or nothing if none was chosen yet.
+amhar_current_generation() {
+  local f
+  f="$(amhar_generation_file)"
+  if [[ -s "$f" ]]; then
+    tr -d ' \n' < "$f"
+    echo
+  fi
 }
 
 amhar_r2_configured() {
