@@ -57,7 +57,7 @@ func trustedProxyMiddleware(cidrs []string) echo.MiddlewareFunc {
 					}
 					client = hop
 				}
-				proto := strings.ToLower(strings.TrimSpace(req.Header.Get("X-Forwarded-Proto")))
+				proto := strings.ToLower(firstHeaderValue(req.Header.Get("X-Forwarded-Proto")))
 				if proto != "https" && proto != "http" {
 					req.Header.Del("X-Forwarded-Proto")
 				} else {

@@ -86,6 +86,20 @@ Prepared steps:
 4. Run `OPENPOST_HEALTH_BASE=https://post.amhar.co bash scripts/amhar/smoke.sh`.
 5. Hand over to Badee3 using [handover-badee3.md](handover-badee3.md).
 
+## 6a. "cross-site session request rejected" (403) behind Replit's proxy
+
+Symptom: sign-in works, but every cookie-authenticated POST (for example creating the first workspace on `/onboarding`) returns 403 `cross-site session request rejected`.
+
+Cause: the session CSRF check compared the browser `Origin` (`https://post.amhar.co`) with the scheme and Host the Go process sees. `UseTrustedProxies` deletes `X-Forwarded-Proto` unless the direct peer is inside `OPENPOST_TRUSTED_PROXY_CIDRS` (unset here), and it also dropped list values such as `https,http`. So the process saw `http` and the check failed.
+
+Fix (commit on `architect/setup`, `apps/server/internal/api/middleware/session_origin.go`):
+
+- The server builds a trusted-origins list from `OPENPOST_APP_URL` and `OPENPOST_PUBLIC_URL` (scheme + host only). An `Origin` exactly equal to one of them passes, whatever Host or proto the proxy forwards.
+- Otherwise the `Origin` must match the first `X-Forwarded-Proto` value (or TLS) plus `X-Forwarded-Host` or `Host`. Any other origin is still rejected, and a POST without an `Origin` is still rejected.
+- The trusted-proxy middleware now keeps the first value of a comma-separated `X-Forwarded-Proto`.
+
+**This is a source change.** The Reserved VM runs the pinned upstream binary (`deploy/replit/pin.env`, `scripts/amhar/build.sh` only downloads it), so a plain republish does not pick it up. Until a binary built from this branch is pinned, the config-only workaround is to set `OPENPOST_TRUSTED_PROXY_CIDRS` to the CIDR of Replit's proxy peer (read `remote_ip` in the request log; do not guess) and republish.
+
 ## 7. What not to do
 
 - Do not merge to `main` except through a release PR after Ahmad's UAT.

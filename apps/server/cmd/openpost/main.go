@@ -253,6 +253,7 @@ func main() {
 	readiness := apiroutes.NewReadiness()
 	e := echo.New()
 	apimiddleware.UseTrustedProxies(e, cfg.TrustedProxyCIDRs)
+	apimiddleware.SetTrustedSessionOrigins(cfg.FrontendURL, cfg.PublicURL)
 	e.Server.ReadHeaderTimeout = 15 * time.Second
 	e.Server.IdleTimeout = 60 * time.Second
 	e.Use(echo.WrapMiddleware(telemetryRecorder.WrapHTTP))
