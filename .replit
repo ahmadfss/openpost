@@ -1,0 +1,30 @@
+# Amhar OpenPost: run the pinned upstream release binary.
+# Do not install or build the JS/Go monorepo on this VM.
+run = "bash scripts/amhar/start.sh"
+language = "bash"
+entrypoint = "scripts/amhar/start.sh"
+
+[nix]
+channel = "stable-25_05"
+
+[packager]
+language = "bash"
+
+[packager.features]
+guessImports = false
+packageSearch = false
+enabledForHosting = false
+
+[deployment]
+run = ["bash", "scripts/amhar/start.sh"]
+build = ["bash", "scripts/amhar/build.sh"]
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[env]
+OPENPOST_EDITION = "selfhost"
+OPENPOST_DATABASE_DRIVER = "sqlite"
+OPENPOST_STORAGE_DRIVER = "s3"
+TZ = "Asia/Baghdad"

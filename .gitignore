@@ -154,3 +154,16 @@ packages/dither/dist/
 
 # Hosted data-plane test report
 apps/server/hosted-data-plane.json
+
+# Amhar runtime (downloaded binaries and local SQLite; never commit)
+/bin/openpost-server*
+/bin/litestream
+/data/
+/openpost-data/
+/tmp/openpost-backup/
+
+__pycache__/
+*.pyc
+
+# Public pin file (sizes and hashes only, no secrets)
+!deploy/replit/pin.env
