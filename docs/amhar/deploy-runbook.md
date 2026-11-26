@@ -113,7 +113,8 @@ Every republish:
    - `OK: litestream <prefix>` and `users in restored database: <n>`
    - `database restored to …`
    - `litestream generation <id> -> backups/litestream-gen/<id>`
-   - `http server started on [::]:8080`
+   - `signin-bg overlay: nginx will listen on 0.0.0.0:8080; openpost on 127.0.0.1:18080`
+   - `http server started on [::]:18080` (OpenPost binds the internal port; nginx is on 8080)
 4. Smoke: `OPENPOST_HEALTH_BASE=https://post.amhar.co bash scripts/amhar/smoke.sh`, sign in, and check the workspace and members.
 5. Run `restore.sh --check` again. It should now pick `backups/litestream-gen/<new id>`.
 6. About ten minutes after boot, the log shows `backup uploaded: backups/sqlite/<id>/openpost-….db and backups/sqlite/openpost-latest.db (…, <n> users)`.

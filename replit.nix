@@ -14,5 +14,8 @@
     pkgs.gnugrep
     pkgs.gawk
     pkgs.bash
+    # nginx fronts OpenPost only to inject the Amhar auth-page artwork.
+    # See scripts/amhar/signin-bg-overlay.sh. Not used to build the monorepo.
+    pkgs.nginx
   ];
 }

@@ -35,3 +35,23 @@ Media is stored only on R2, so a republish does not delete posts' images or vide
 ## Build vs run
 
 The Replit build command (`scripts/amhar/build.sh`) only downloads and verifies the pinned OpenPost and Litestream binaries. It does not compile the monorepo or run `bun`/`npm`. The run command starts the already-downloaded binary so the publish health check is not blocked by a 511 MB download.
+
+
+## Sign-in background overlay
+
+The pinned upstream binary embeds the OpenPost frontend, including the public
+auth pages. This fork does not rebuild that frontend. A small nginx sidecar
+(`pkgs.nginx` in `replit.nix`) listens on the public port (8080), serves
+`branding/amhar-signin-bg/` at `/amhar-signin-bg/`, injects a stylesheet and
+script into HTML responses, and proxies everything else to OpenPost on
+`127.0.0.1:18080`. The script enables the artwork only on `/login`,
+`/register`, `/forgot-password`, and `/reset-password`.
+
+On boot, `scripts/amhar/start.sh` appends `127.0.0.1/32,::1/128` to
+`OPENPOST_TRUSTED_PROXY_CIDRS` so session CSRF still sees Replit's forwarded
+`Origin` / `X-Forwarded-*` headers through the extra hop. Existing CIDRs are
+kept. Disable the overlay with `OPENPOST_SIGNIN_BG_OVERLAY=0` (then republish).
+
+When the overlay is on, OpenPost logs `http server started on [::]:18080`, not
+`:8080`. The Replit health check and `https://post.amhar.co` still hit nginx
+on 8080.

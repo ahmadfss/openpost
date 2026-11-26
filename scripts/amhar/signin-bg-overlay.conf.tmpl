@@ -1,0 +1,87 @@
+# Generated at boot by scripts/amhar/signin-bg-overlay.sh. Do not edit on the VM.
+worker_processes 1;
+error_log __ERROR_LOG__ warn;
+pid __PID_FILE__;
+daemon off;
+
+events {
+  worker_connections 256;
+}
+
+http {
+  types {
+    text/css css;
+    application/javascript js;
+    image/webp webp;
+    image/jpeg jpg jpeg;
+    image/png png;
+    text/html html;
+    application/json json;
+  }
+  default_type application/octet-stream;
+  access_log off;
+  sendfile on;
+  client_max_body_size 1024m;
+  client_body_temp_path __TEMP_DIR__/body;
+  proxy_temp_path __TEMP_DIR__/proxy;
+  fastcgi_temp_path __TEMP_DIR__/fastcgi;
+  uwsgi_temp_path __TEMP_DIR__/uwsgi;
+  scgi_temp_path __TEMP_DIR__/scgi;
+  proxy_request_buffering off;
+  proxy_read_timeout 300s;
+  proxy_send_timeout 300s;
+
+  # Document navigations send Accept: text/html. Strip Accept-Encoding so
+  # sub_filter can see </head> on uncompressed HTML, then re-gzip.
+  map $http_accept $amhar_accept_encoding {
+    default $http_accept_encoding;
+    ~*text/html "";
+  }
+
+  map $http_x_forwarded_proto $amhar_fwd_proto {
+    default $http_x_forwarded_proto;
+    ""      $scheme;
+  }
+
+  map $http_x_forwarded_host $amhar_fwd_host {
+    default $http_x_forwarded_host;
+    ""      $host;
+  }
+
+  map $http_upgrade $amhar_connection_upgrade {
+    default upgrade;
+    ""      close;
+  }
+
+  server {
+    listen __PUBLIC_PORT__;
+    listen [::]:__PUBLIC_PORT__;
+    server_name _;
+
+    location ^~ /amhar-signin-bg/ {
+      alias __ASSET_ROOT__/;
+      expires 7d;
+      add_header Cache-Control "public, max-age=604800";
+      add_header X-Content-Type-Options nosniff;
+    }
+
+    location / {
+      proxy_pass http://127.0.0.1:__INTERNAL_PORT__;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host $amhar_fwd_host;
+      proxy_set_header X-Forwarded-Proto $amhar_fwd_proto;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $amhar_connection_upgrade;
+      proxy_set_header Accept-Encoding $amhar_accept_encoding;
+      proxy_buffering on;
+
+      sub_filter '</head>' '<link rel="stylesheet" href="/amhar-signin-bg/auth.css"><script src="/amhar-signin-bg/auth.js" defer></script></head>';
+      sub_filter_once on;
+      gzip on;
+      gzip_types text/css application/javascript application/json;
+    }
+  }
+}

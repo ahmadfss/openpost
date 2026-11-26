@@ -1,0 +1,55 @@
+/* Amhar artwork for OpenPost auth pages only.
+   html.amhar-auth-bg is set by auth.js on /login, /register,
+   /forgot-password, and /reset-password. */
+
+html.amhar-auth-bg,
+html.amhar-auth-bg body {
+  background-color: #d9cbb6;
+}
+
+html.amhar-auth-bg main[data-slot="standalone-shell"] {
+  box-sizing: border-box;
+  background-color: #d9cbb6;
+  background-image: image-set(
+    url("/amhar-signin-bg/option-f-riverside-morning.webp") type("image/webp"),
+    url("/amhar-signin-bg/option-f-riverside-morning.jpg") type("image/jpeg")
+  );
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* The OpenPost mark sits above the card; أمهر is already in the artwork. */
+html.amhar-auth-bg main[data-slot="standalone-shell"] > div > a.inline-flex.size-16,
+html.amhar-auth-bg main[data-slot="standalone-shell"] > div > div.size-16 {
+  display: none;
+}
+
+/* Card default is #faf9f7 (theme-color) with a faint border and no shadow.
+   The artwork's centre is light cream stone, so strengthen both. */
+html.amhar-auth-bg main[data-slot="standalone-shell"] [data-slot="card"] {
+  background-color: #faf9f7;
+  border-color: rgba(45, 32, 18, 0.22);
+  box-shadow:
+    0 1px 2px rgba(28, 22, 16, 0.1),
+    0 18px 40px rgba(28, 22, 16, 0.2);
+}
+
+/* On tall/narrow viewports, cover+center crops the in-image wordmark
+   (upper-left of a 16:9 frame). Pin a separate mark in the safe area. */
+@media (max-width: 720px) {
+  html.amhar-auth-bg main[data-slot="standalone-shell"]::before {
+    content: "";
+    position: fixed;
+    top: max(0.75rem, env(safe-area-inset-top));
+    left: max(0.75rem, env(safe-area-inset-left));
+    width: 7.25rem;
+    height: 4.75rem;
+    background-image: url("/amhar-signin-bg/wordmark-colour-tight.webp");
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: left top;
+    pointer-events: none;
+    z-index: 2;
+  }
+}

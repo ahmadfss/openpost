@@ -31,7 +31,9 @@ Never commit values. Never paste tokens into chat or screenshots.
 | `OPENPOST_STORAGE_DRIVER` | `s3` |
 | `TZ` | `Asia/Baghdad` |
 | `OPENPOST_DISABLE_REGISTRATIONS` | `false` until the first admin exists, then `true`. An admin override saved in Settings → Advanced → Configuration is stored encrypted in SQLite and applied after the environment at startup, so the override wins. Keep the secret `true` as well, so a database restored without the override is still closed. |
-| `OPENPOST_TRUSTED_PROXY_CIDRS` | Set once TLS is terminated in front of the process, if callbacks or scheme detection mis-fire |
+| `OPENPOST_TRUSTED_PROXY_CIDRS` | Set once TLS is terminated in front of the process, if callbacks or scheme detection mis-fire. When the sign-in overlay is on, `start.sh` appends `127.0.0.1/32,::1/128` and does not remove existing CIDRs. |
+| `OPENPOST_SIGNIN_BG_OVERLAY` | Optional. Default on. Set to `0` and republish to serve OpenPost directly with no auth-page artwork. |
+| `OPENPOST_INTERNAL_PORT` | Optional. Default `18080`. OpenPost listen port when the overlay is on. Do not publish this port. |
 | `OPENPOST_TELEMETRY_ENABLED` | `false` |
 | `OPENPOST_WORKFLOWS_AI_ENABLED` | `false` until an AI key is explicitly approved |
 | `OPENPOST_EMAIL_VERIFICATION_REQUIRED` | `false` until email is configured |

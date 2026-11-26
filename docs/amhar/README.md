@@ -2,7 +2,7 @@
 
 Amhar runs a self-hosted [OpenPost](https://github.com/getopenpost/openpost) instance so Badee3 can schedule social posts (X, LinkedIn, Facebook, Instagram, YouTube Shorts) from the web UI and through MCP.
 
-This fork does not rebuild OpenPost. Replit downloads the pinned upstream linux-amd64 release (`v7.42.5` at first deploy), verifies its size and SHA-256, installs ffmpeg, and runs the single binary. The database is SQLite on the Reserved VM, with continuous Litestream replication and a nightly snapshot to Cloudflare R2.
+This fork does not rebuild OpenPost. Replit downloads the pinned upstream linux-amd64 release (`v7.42.5` at first deploy), verifies its size and SHA-256, installs ffmpeg and nginx, and runs the single binary. Nginx is only used to inject the Amhar sign-in artwork; see [architecture.md](architecture.md#sign-in-background-overlay). The database is SQLite on the Reserved VM, with continuous Litestream replication and a nightly snapshot to Cloudflare R2.
 
 | Document | Contents |
 | --- | --- |

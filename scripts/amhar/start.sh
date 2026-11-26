@@ -6,6 +6,8 @@
 set -euo pipefail
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "$0")" && pwd)/common.sh"
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "$0")" && pwd)/signin-bg-overlay.sh"
 cd "$(amhar_root)"
 amhar_load_pin
 amhar_prepare_dirs
@@ -28,6 +30,30 @@ export TZ="${TZ:-Asia/Baghdad}"
 export OPENPOST_TELEMETRY_ENABLED="${OPENPOST_TELEMETRY_ENABLED:-false}"
 export OPENPOST_WORKFLOWS_AI_ENABLED="${OPENPOST_WORKFLOWS_AI_ENABLED:-false}"
 export OPENPOST_EMAIL_VERIFICATION_REQUIRED="${OPENPOST_EMAIL_VERIFICATION_REQUIRED:-false}"
+
+# Public port stays at $PORT (8080). When the sign-in overlay is on,
+# OpenPost itself moves to 127.0.0.1:18080 and nginx listens on 8080.
+overlay=0
+_amhar_orig_port="$OPENPOST_PORT"
+_amhar_orig_cidrs="${OPENPOST_TRUSTED_PROXY_CIDRS-}"
+if amhar_signin_bg_enabled && amhar_signin_bg_nginx_bin >/dev/null; then
+  amhar_signin_bg_prepare
+  if amhar_signin_bg_test_config; then
+    overlay=1
+  else
+    echo "WARNING: signin-bg nginx config is invalid; serving OpenPost directly on ${_amhar_orig_port}" >&2
+    export OPENPOST_PORT="$_amhar_orig_port"
+    if [[ -n "$_amhar_orig_cidrs" ]]; then
+      export OPENPOST_TRUSTED_PROXY_CIDRS="$_amhar_orig_cidrs"
+    else
+      unset OPENPOST_TRUSTED_PROXY_CIDRS
+    fi
+    unset AMHAR_SIGNIN_BG_NGINX_CONF
+  fi
+elif amhar_signin_bg_enabled; then
+  echo "WARNING: signin-bg overlay assets are present but nginx is not installed; serving OpenPost directly" >&2
+fi
+unset _amhar_orig_port _amhar_orig_cidrs
 
 db="$(amhar_db_path)"
 gen_file="$(amhar_generation_file)"
@@ -84,6 +110,11 @@ if amhar_r2_configured && [[ -x "$ls_bin" ]]; then
     done
   ) &
   echo "nightly sqlite backup loop started (pid $!)"
+  if [[ "$overlay" == 1 ]]; then
+    export AMHAR_OPENPOST_BIN="$server_bin"
+    echo "starting openpost $OPENPOST_RELEASE behind signin-bg nginx on 0.0.0.0:${AMHAR_PUBLIC_PORT} (openpost 127.0.0.1:${OPENPOST_PORT}, sqlite $db) under litestream replicate -exec"
+    exec "$ls_bin" replicate -config "$(amhar_data_dir)/litestream.yml" -exec "$(amhar_root)/scripts/amhar/signin-bg-run.sh"
+  fi
   echo "starting openpost $OPENPOST_RELEASE on 0.0.0.0:${OPENPOST_PORT} (sqlite $db) under litestream replicate -exec"
   # Litestream runs OpenPost as its child: on SIGTERM it stops OpenPost, does
   # a final sync, and exits; if OpenPost exits, Litestream exits too.
@@ -91,5 +122,10 @@ if amhar_r2_configured && [[ -x "$ls_bin" ]]; then
 fi
 
 echo "WARNING: litestream is not running; the database is NOT being replicated" >&2
+if [[ "$overlay" == 1 ]]; then
+  export AMHAR_OPENPOST_BIN="$server_bin"
+  echo "starting openpost $OPENPOST_RELEASE behind signin-bg nginx on 0.0.0.0:${AMHAR_PUBLIC_PORT} (openpost 127.0.0.1:${OPENPOST_PORT}, sqlite $db)"
+  exec bash "$(amhar_root)/scripts/amhar/signin-bg-run.sh"
+fi
 echo "starting openpost $OPENPOST_RELEASE on 0.0.0.0:${OPENPOST_PORT} (sqlite $db)"
 exec "$server_bin"
