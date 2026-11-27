@@ -12,8 +12,8 @@ amhar_load_pin() {
   local root pin
   root="$(amhar_root)"
   pin="$root/deploy/replit/pin.env"
-  # shellcheck disable=SC1090
   set -a
+  # shellcheck disable=SC1090
   source "$pin"
   set +a
 }

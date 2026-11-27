@@ -45,8 +45,10 @@ if [[ -f "$db" ]]; then
   fi
 elif amhar_r2_configured; then
   echo "no local database; restoring from R2"
+  restore_t0="$(date +%s)"
   rc=0
-  bash scripts/amhar/restore.sh || rc=$?
+  bash scripts/amhar/restore.sh < /dev/null || rc=$?
+  echo "restore.sh exited $rc after $(($(date +%s) - restore_t0))s"
   case "$rc" in
     0) ;;
     3) echo "R2 has no backups yet (first boot); starting with a fresh SQLite database at $db" ;;

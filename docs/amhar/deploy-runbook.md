@@ -107,6 +107,7 @@ Background: [backup-and-restore.md](backup-and-restore.md), incident of 26 Nov 2
 Every republish:
 
 1. Run `bash scripts/amhar/restore.sh --check` (box or Repl Shell, R2 variables loaded). It must end with `check: a boot would restore from: litestream …` and show the expected `users in restored database`. If it says `FAIL CLOSED`, do not republish.
+   Then time the boot path itself, read-only: `time bash scripts/amhar/restore.sh --check-fast`. It must end with `check-fast: a boot would restore from: …` well inside the promote window (target: under 60 s). If it takes more than about 3 minutes, do not republish.
 2. Avoid admin changes while the promote runs. Writes to the old VM after the new VM restored are not carried over.
 3. Republish. In the deployment logs look for, in order:
    - `restore candidates (newest first):`
