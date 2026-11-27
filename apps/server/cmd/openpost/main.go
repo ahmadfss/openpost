@@ -518,17 +518,11 @@ func main() {
 			cancelConfigure()
 		}
 	}
-	providers, providerEntries, err := platform.BuildAdapterRegistry(providerAppConfigs, platform.RegistryOptions{
-		LinkedInAuthMode:              cfg.LinkedInAuthMode,
-		DisableLinkedInThreadReplies:  cfg.DisableLinkedInThreadReplies,
-		EnableLinkedInOrganizations:   cfg.EnableLinkedInOrganizations,
-		EnableLinkedInMemberReads:     cfg.EnableLinkedInMemberReads,
-		EnableLinkedInMemberAnalytics: cfg.EnableLinkedInMemberAnalytics,
-		DisableTikTokDisplayAPI:       cfg.DisableTikTokDisplayAPI,
-	})
+	providers, providerEntries, err := platform.BuildAdapterRegistry(providerAppConfigs, providerRegistryOptions(cfg))
 	if err != nil {
 		fatalfWithDiagnostics(diagnosticsReporter, "failed to build provider app registry: %v", err)
 	}
+	logTikTokRequestedScopes(providers)
 	blueskyPDSEntries, err := blueskyPDSRegistryEntries(context.Background(), db, providers)
 	if err != nil {
 		fatalfWithDiagnostics(diagnosticsReporter, "failed to load bluesky PDS registry from database: %v", err)
@@ -1593,4 +1587,29 @@ func blueskyPDSRegistryEntries(ctx context.Context, db *bun.DB, providers map[st
 		})
 	}
 	return entries, nil
+}
+
+// providerRegistryOptions maps the effective runtime configuration (env plus
+// administrator-managed database overrides already applied) onto the adapter
+// registry options, so every flag that shapes an adapter has one wiring point.
+func providerRegistryOptions(cfg *config.Config) platform.RegistryOptions {
+	return platform.RegistryOptions{
+		LinkedInAuthMode:              cfg.LinkedInAuthMode,
+		DisableLinkedInThreadReplies:  cfg.DisableLinkedInThreadReplies,
+		EnableLinkedInOrganizations:   cfg.EnableLinkedInOrganizations,
+		EnableLinkedInMemberReads:     cfg.EnableLinkedInMemberReads,
+		EnableLinkedInMemberAnalytics: cfg.EnableLinkedInMemberAnalytics,
+		DisableTikTokDisplayAPI:       cfg.DisableTikTokDisplayAPI,
+	}
+}
+
+// logTikTokRequestedScopes records the OAuth scope set the TikTok adapter will
+// request, so operators can confirm OPENPOST_DISABLE_TIKTOK_DISPLAY_API took
+// effect without starting a connect flow. Scopes are not secret.
+func logTikTokRequestedScopes(providers map[string]platform.Adapter) {
+	adapter, ok := providers["tiktok"].(*platform.TikTokAdapter)
+	if !ok {
+		return
+	}
+	log.Printf("TikTok OAuth scopes: %s", strings.Join(adapter.RequestedScopes(), ","))
 }
